@@ -6,7 +6,7 @@ Project Description Below:
 
 Numerical Weather Prediction
 Final Project
-Due Monday, December 16, 2019
+
 The shallow water equations with bottom topography can be written as
 
 ∂V/∂t + qk × V∗ + ∇(K + Φ) = 0 (1)
