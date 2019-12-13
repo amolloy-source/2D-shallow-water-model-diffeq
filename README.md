@@ -4,7 +4,7 @@ This is a class project for Numerical Weather Prediction
 Project Description Below:
 
 
-CLIM 470 Numerical Weather Prediction
+Numerical Weather Prediction
 Final Project
 Due Monday, December 16, 2019
 The shallow water equations with bottom topography can be written as
