@@ -1,0 +1,238 @@
+Program Shallow
+
+
+
+!-------------------------------Parameters-------------------------------------
+
+Lx = 6e+06	  ! domain size in x direction
+Ly = 2e+06	  ! domain size in y direction
+
+d =  5e+05	  ! Resolution in meters
+!d =  2.5e+05
+!d =  1.25e+05
+
+delt = 10*60 !time steps
+!delt = 5*60
+!delt = 2.5*60
+
+!forcing coefficients
+f1 = 23*delt/12
+f2 = 4*delt/3
+f3 = 5*delt/12
+
+Nx = Lx/d	+ 1	! number of grid points in the x direction (13,25,49)
+Ny = Ly/d + 1	! number of grid points in the y direction (5,9,17)
+
+hs(Nx)		! surface height
+hs_t = 2e+03	! Height of topography
+
+!--------------------------------Resolution------------------------------------
+! resolution 1
+if (d == 5.e+05) then
+hs(Nx/2) = hs_t
+end if
+! resolution 2
+if (d == 2.5e+05) then
+hs(Nx/2-1) = 1e+03
+hs(Nx/2) = hs_t
+hs(Nx/2+1) = 1e+03
+end if
+! resolution 3
+if (d == 1.25e+05) then
+hs(Nx/2-2) = 0.5e+03
+hs(Nx/2-1) = 0.5e+03
+hs(Nx/2) = hs_t
+hs(Nx/2+1) = 0.5e+03
+hs(Nx/2+2) = 0.5e+03
+end if
+
+!------------------------------Arrays------------------------------------------
+!establish arrays for hu0,hv0,hq0,us0,vs0
+hu0(Nx,Ny-1,3)
+hv0(Nx-1,Ny,3)
+hq0(Nx,Ny,3)
+us0(Nx,Ny-1,3)
+vs0(Nx-1,Ny,3)
+!establish arrays for h,u,v,z,q
+h(Nx-1,Ny-1)
+u(Nx,Ny-1)
+v(Nx-1,Ny)
+z(Nx,Ny)
+q(Nx,Ny)
+!establish arrays for AB-Scheme coefficient of forcing
+alp0(Nx,Ny-1,3)
+bet0(Nx,Ny-1,3)
+gam0(Nx,Ny-1,3)
+dlt0(Nx,Ny-1,3)
+eps0(Nx-1,Ny-1,3)
+!kinetic energy
+ken0(Nx,Ny,3)
+!geopotential height
+phi0(Nx,Ny,3)
+!potential vorticity
+q0(Nx,Ny,3)
+z0(Nx,Ny,3)
+
+
+!-----------------------Initial Conditions OR n=1------------------------------
+
+u(1:Nx,1:Ny) = 0.05 ! within domain
+v(1:Nx,1) = 0.0 ! Lower boundary
+v(1:Nx,Ny) = 0.0 ! Upper boundary
+v(1:Nx,2:Ny-1) = 0.1 ! within domain
+q(1:Nx,1) = 0.0 ! lower boundary
+q(1:Nx,Ny) = 0.0 ! upper boundary
+q(1,1:Ny) = 0.0 ! west boundary
+q(Nx,1:Ny) = 0.0 ! east boundary
+! topography equals height of surface
+do i=1,Nx
+  h0(i,:) = hs(i) 
+end do
+!hu0
+hu0(1,:,1) = (h(Nx-1,:,1)+h(1,:,1))/2.0 !hu0 at the left boundary for all y
+hu0(Nx,:,1) = (h(Nx-1,:,1)+h(1,:,1))/2.0 !hu0 at the right boundary for all y
+do ix = 2, Nx-1 !hu0 iterated from 2 to Nx - 1
+  iv = ix + 1 !hu0 indexed by +1 offset in x direction
+  hu0(ix,:,1)=(h(iv,:,1) + h(iv-1,:,1))/2.0 !hu0 within the domain
+end do
+!hv0
+hv0(:,1,1) = (h(:,Ny-1,1) + h(:,1,1))/2.0 !hv0 at the bottom row for all x
+hv0(:,Ny,1) = (h(:,Ny-1,1) + h(:,1,1))/2.0 !hv0 at top row for all x
+do iy = 2, Ny-1 !hv0 iterated from 2 to Ny - 1
+  iu = iy + 1 !hv0 indexed by +1 offset in y direction
+  hv0(:,iy,1) = (h(:,iu,1) + h(:,iu-1,1))/2.0 !hv0 within the domain
+end do
+!hq0
+hq0(1,:,1) = (hv0(1,:,1) + hv0(Nx-1,:,1))/2.0 !hq0 at the left boundary
+hq0(Nx,:,1) = (hv0(1,:,1) + hv0(Nx-1,:,1))/2.0 !hq0 at the right boundary
+do ix = 2, Nx-1 !hq0 iterated from 2 to Nx - 1
+  do iy = 1, Ny !hq0 iterated from 1 to Ny
+    hq0(ix,iy,1) = (hv0(ix,:,1) + hv0(ix-1,:,1))/2.0 !hq0 within the domain
+  end do
+end do
+!us0 and vs0
+us0(:,:,1)= hu0(:,:,1)*u(:,:)
+vs0(:,:,1)= hv0(:,:,1)*v(:,:)
+!initial relative vorticity
+!left to right relative vorticity
+do iy = 2, Ny-1 !need to index properly
+  z0(1,iy,1)=(u(1,iy-1)-u(1,iy)+v(2,iy)-v(Nx,iy))/d !for all iy until Ny - 1
+  z0(Nx,iy,1)=(u(Nx,iy-1)-u(1,iy)+v(1,iy)-v(Nx-1,iy))/d !for all iy until Ny - 1
+end do
+!bottom to top relative vorticity
+do ix = 2, Nx - 1
+  z0(ix,1,1)=(-u(ix,1)+v(ix,1)-v(ix-1,1))/d !for all ix until Nx - 1
+  z0(ix,Ny,1)=(u(xi,Ny-1)+v(ix,Ny)-v(ix-1,Ny))/d !for all ix until Nx - 1
+end do
+!interior of domain relative vorticity
+do ix=2, Nx-1
+  iv= ix + 1
+  do iy = 2, Ny-1
+    iu = iy + 1
+    z0(ix,iy,1)=(u(ix,iu-1)-u(ix,iu)+v(iv+1,iy)-v(iv,iy))/2
+  end do
+end do
+!forcing coefficients alpha and delta
+do ix = 1, Nx - 1
+  do iy = 1, Ny - 1
+    alp0(ix,iy,1) = (1/24)*(2*q0(ix+1,iy+1)+q0(ix,iy+1)+2*q0(ix,iy)+q0(ix+1,iy))
+    dlt0(ix,iy,1) = (1/24)*(q0(ix+1,iy+1)+2*q0(ix,iy+1)+q0(ix,iy)+2*q0(ix+1,iy))
+    eps0(ix,iy,1) = (1/24)*(q0(ix+1,iy+1)+q0(ix,iy+1)-q0(ix,iy)-q0(ix+1,iy))
+  end do
+end do
+!forcing coefficients beta and gamma
+!boundary conditions
+do iy = 1, Ny - 1
+  bet0(1,iy,1) = (1/24)*(q0(ix,iy+1)+2*q0(Nx,iy+1)+q0(Nx,iy)+2*q0(ix,iy))
+  gam0(1,iy,1) = (1/24)*(2*q0(ix,iy+1)+q0(Nx,iy+1)+2*q0(Nx,iy)+q0(ix,iy))
+end do
+!interior points
+do ix = 2, Nx - 1
+  do iy = 1, Ny - 1
+    bet0(ix,iy,1) = (1/24)*(q0(ix,iy+1)+2*q0(ix-1,iy+1)+q0(ix-1,iy)+2*q0(ix,iy))
+    gam0(ix,iy,1) = (1/24)*(2*q0(ix,iy+1)+q0(ix-1,iy+1)+2*q0(ix-1,iy)+q0(ix,iy))
+  end do
+end do
+!initial geopotential height
+do ix = 1, Nx
+  phi0(ix,:,1) = g*hs(ix)
+end do
+!initial potential vorticity
+q0(:,:,1) = (f+z0(:,:,1))/hq0(:,:,1)
+
+!--------------------Forward Euler Scheme for timesteps 2,3--------------------
+do n = 2,3
+
+do ix = 2, Nx-1
+  do iy = 2, Ny-1
+    h(ix,iy) = h(ix,iy)-delt*(us0(ix+1,iu,n-1)-us0(ix,iu,n-1)+vs0(iv,iy+1,n-1)&
+    -vs0(iv,iy,n-1))/d
+  end do
+end do
+
+!iterated potential vorticity
+q0(:,:,n) = (f+z0(:,:,n))/hq0(:,:,n)
+ !Periodic boundary conditions
+hu0(1,:,n) = (h0(Nx,:,n)+h0(2,:,n))/2.0
+hu0(Nx,:,n) = (h0(Nx-1,:,n)+h0(1,:,n))/2.0
+
+do i = 2,Nx-1
+  hu0(i,:,n) = (h0(i-1,:,n)+h0(i+1,:,n))/2.0
+end do
+
+h0(:,1,n) = (h0(:,Ny,n)+h0(:,2,n))/2.0
+hv0(:,Nv,n) = (h0(:,Ny-1,n)+h0(:,1,n))/2.0
+do j = 2,Ny-1
+  hv0(:,j,n) = (h0(:,j-1,n) + h0(:,j+1,n))/2.0
+end do
+
+us0(:,:,n)= hu0(:,:,n)*u(:,;)
+vs0(:,:,n)= hv0(:,:,n)*v(:,:)
+end do
+
+
+
+!Adams Bashforth scheme given forward scheme timesteps
+nstep = 4
+do n = 4, ntime
+  nstep = nstep + 1
+  do i = 2, Nx-1
+    do j = 2, Ny-1
+      h(i,j)-f1*(us1(i+1,j+1)-us1(i,j+1)+vs1(i+1,j+1)-vs1(i+1,j))+ &
+      f2*(us2(i+1,j+1)-us2(i,j+1)+vs2(i+1,j+1)-vs2(i+1,j))+ &
+      -f3*(us3(i+1,j+1)-us3(i,j+1)+vs3(i+1,j+1)-vs3(i+1,j))
+    end do
+  end do
+
+!hv1
+do ix = 2, Nx-1
+  iv = ix + 1
+  hu(iv,:) = (h(iv-1,:) + h(iv,1,:))/2.0
+end do
+
+!hu1
+do iy = 2, Ny-1
+  iu = iy + 1
+  hu(:,iy) = (h(:,iu-1) + h(:,iu))/2.0
+end do
+
+us(:,:)=hu(:,:)*u(:,:)
+vs(:,:)=hv(:,:)*v(:,:)
+
+us1=us2
+us2=us3
+us3=us
+hu1=hu2
+hu2=hu3
+hu3=hu
+hv1=hv2
+hv2=hv3
+hv3=hv
+
+!time loop
+if (nstep == 1440) then
+  write(10,*)h,u,v
+  nstep = 0
+end do
+
+end Program Shallow
