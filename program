@@ -1,7 +1,17 @@
 Program Shallow
 
 
+integer:: ix,iy,iu,iv,n
 
+real:: f1,f2,f3,g,f,hs(:),us(:,:),us1(:,:),us2(:,:),us3(:,:),vs(:,:),vs1(:,:),&
+vs2(:,:),vs3(:,:),hu(:,:),hv(:,:),h0(:,:,:),hu0(:,:,:),hv0(:,:,:),hq0(:,:,:), &
+us0(:,:,:),vs0(:,:,:),h(:,:),u(:,:),v(:,:),z(:,:),q(:,:),alp0(:,:,:),bet0(:,:,:),&
+gam0(:,:,:),dlt0(:,:,:),eps0(:,:,:),zet0(:,:,:),ken0(:,:,:),phi0(:,:,:),&
+q0(:,:,:),z0(:,:,:),alp1(:,:),bet1(:,:),gam1(:,:),dlt1(:,:),eps1(:,:),&
+zet1(:,:),ken1(:,:),phi1(:,:),q1(:,:),z1(:,:),alp2(:,:),bet2(:,:),gam2(:,:),&
+dlt2(:,:),eps2(:,:),zet2(:,:),ken2(:,:),phi2(:,:),alp3(:,:),bet3(:,:),&
+gam3(:,:),dlt3(:,:),eps3(:,:),zet3(:,:),ken3(:,:),phi3(:,:),q3(:,:),z3(:,:),&
+Lx,Ly,d,hs_t,delt,Nx,Ny
 !-------------------------------Parameters-------------------------------------
 
 Lx = 6e+06	  ! domain size in x direction
@@ -20,8 +30,8 @@ f1 = 23*delt/12
 f2 = 4*delt/3
 f3 = 5*delt/12
 
-Nx = Lx/d	+ 1	! number of grid points in the x direction (13,25,49)
-Ny = Ly/d + 1	! number of grid points in the y direction (5,9,17)
+Nx = Lx/d	+ 1	! number of grid points in the x direction (13,  25, 49)
+Ny = Ly/d + 1	! number of grid points in the y direction (  5,    9, 17)
 
 hs(Nx)		! surface height
 hs_t = 2e+03	! Height of topography
@@ -47,7 +57,8 @@ hs(Nx/2+2) = 0.5e+03
 end if
 
 !------------------------------Arrays------------------------------------------
-!establish arrays for hu0,hv0,hq0,us0,vs0
+!establish arrays for h0,hu0,hv0,hq0,us0,vs0
+h0(Nx-1,Ny-1,3)
 hu0(Nx,Ny-1,3)
 hv0(Nx-1,Ny,3)
 hq0(Nx,Ny,3)
@@ -59,7 +70,7 @@ u(Nx,Ny-1)
 v(Nx-1,Ny)
 z(Nx,Ny)
 q(Nx,Ny)
-!establish arrays for AB-Scheme coefficient of forcing
+!establish arrays for coefficient of forcing
 alp0(Nx,Ny-1,3)
 bet0(Nx,Ny-1,3)
 gam0(Nx,Ny-1,3)
@@ -76,7 +87,7 @@ z0(Nx,Ny,3)
 
 !-----------------------Initial Conditions OR n=1------------------------------
 
-u(1:Nx,1:Ny) = 0.05 ! within domain
+u(1:Nx,1:Ny) = 0.05
 v(1:Nx,1) = 0.0 ! Lower boundary
 v(1:Nx,Ny) = 0.0 ! Upper boundary
 v(1:Nx,2:Ny-1) = 0.1 ! within domain
@@ -84,20 +95,24 @@ q(1:Nx,1) = 0.0 ! lower boundary
 q(1:Nx,Ny) = 0.0 ! upper boundary
 q(1,1:Ny) = 0.0 ! west boundary
 q(Nx,1:Ny) = 0.0 ! east boundary
-! topography equals height of surface
-do i=1,Nx
-  h0(i,:) = hs(i) 
+!------------------------Differential Equations--------------------------------
+!h0
+do ix = 1, Nx - 1
+  do iy = 1, Ny - 1
+    iv = ix + 1
+    h0(ix,iy,1) = hs(ix) !topography equals height of surface
+  end do
 end do
 !hu0
-hu0(1,:,1) = (h(Nx-1,:,1)+h(1,:,1))/2.0 !hu0 at the left boundary for all y
-hu0(Nx,:,1) = (h(Nx-1,:,1)+h(1,:,1))/2.0 !hu0 at the right boundary for all y
+hu0(1,:,1) = (h0(Nx-1,:,1)+h0(1,:,1))/2.0 !hu0 at the left boundary for all y
+hu0(Nx,:,1) = (h0(Nx-1,:,1)+h0(1,:,1))/2.0 !hu0 at the right boundary for all y
 do ix = 2, Nx-1 !hu0 iterated from 2 to Nx - 1
   iv = ix + 1 !hu0 indexed by +1 offset in x direction
   hu0(ix,:,1)=(h(iv,:,1) + h(iv-1,:,1))/2.0 !hu0 within the domain
 end do
 !hv0
-hv0(:,1,1) = (h(:,Ny-1,1) + h(:,1,1))/2.0 !hv0 at the bottom row for all x
-hv0(:,Ny,1) = (h(:,Ny-1,1) + h(:,1,1))/2.0 !hv0 at top row for all x
+hv0(:,1,1) = (h0(:,Ny-1,1) + h0(:,1,1))/2.0 !hv0 at the bottom row for all x
+hv0(:,Ny,1) = (h0(:,Ny-1,1) + h0(:,1,1))/2.0 !hv0 at top row for all x
 do iy = 2, Ny-1 !hv0 iterated from 2 to Ny - 1
   iu = iy + 1 !hv0 indexed by +1 offset in y direction
   hv0(:,iy,1) = (h(:,iu,1) + h(:,iu-1,1))/2.0 !hv0 within the domain
@@ -113,16 +128,16 @@ end do
 !us0 and vs0
 us0(:,:,1)= hu0(:,:,1)*u(:,:)
 vs0(:,:,1)= hv0(:,:,1)*v(:,:)
-!initial relative vorticity
+!relative vorticity
 !left to right relative vorticity
-do iy = 2, Ny-1 !need to index properly
+do iy = 2, Ny-1
   z0(1,iy,1)=(u(1,iy-1)-u(1,iy)+v(2,iy)-v(Nx,iy))/d !for all iy until Ny - 1
   z0(Nx,iy,1)=(u(Nx,iy-1)-u(1,iy)+v(1,iy)-v(Nx-1,iy))/d !for all iy until Ny - 1
 end do
 !bottom to top relative vorticity
 do ix = 2, Nx - 1
   z0(ix,1,1)=(-u(ix,1)+v(ix,1)-v(ix-1,1))/d !for all ix until Nx - 1
-  z0(ix,Ny,1)=(u(xi,Ny-1)+v(ix,Ny)-v(ix-1,Ny))/d !for all ix until Nx - 1
+  z0(ix,Ny,1)=(u(ix,Ny-1)+v(ix,Ny)-v(ix-1,Ny))/d !for all ix until Nx - 1
 end do
 !interior of domain relative vorticity
 do ix=2, Nx-1
@@ -132,12 +147,13 @@ do ix=2, Nx-1
     z0(ix,iy,1)=(u(ix,iu-1)-u(ix,iu)+v(iv+1,iy)-v(iv,iy))/2
   end do
 end do
-!forcing coefficients alpha and delta
+!forcing coefficients alpha delta epsilon
 do ix = 1, Nx - 1
   do iy = 1, Ny - 1
     alp0(ix,iy,1) = (1/24)*(2*q0(ix+1,iy+1)+q0(ix,iy+1)+2*q0(ix,iy)+q0(ix+1,iy))
     dlt0(ix,iy,1) = (1/24)*(q0(ix+1,iy+1)+2*q0(ix,iy+1)+q0(ix,iy)+2*q0(ix+1,iy))
     eps0(ix,iy,1) = (1/24)*(q0(ix+1,iy+1)+q0(ix,iy+1)-q0(ix,iy)-q0(ix+1,iy))
+    zet0(ix,iy,1) = (1/24)*(-q0(ix+1,iy+1)+q0(ix,iy+1)+q0(ix,iy)-q0(ix+1,iy))
   end do
 end do
 !forcing coefficients beta and gamma
@@ -159,17 +175,27 @@ do ix = 1, Nx
 end do
 !initial potential vorticity
 q0(:,:,1) = (f+z0(:,:,1))/hq0(:,:,1)
-
+!kinetic energy
+do ix = 1, Nx - 1
+  iv = ix + 1
+  do iy = 1, Ny - 1
+    iu = iy + 1
+    ken0(:,:,1) = ((us0(ix,iu,1)+us0(ix+1,iu,1)/2)**2)+ &
+(((vs0(iv,iy+1,1)+vs0(iv,iy,1)/2)**2))/2
+  end do
+end do
 !--------------------Forward Euler Scheme for timesteps 2,3--------------------
 do n = 2,3
 
-do ix = 2, Nx-1
-  do iy = 2, Ny-1
-    h(ix,iy) = h(ix,iy)-delt*(us0(ix+1,iu,n-1)-us0(ix,iu,n-1)+vs0(iv,iy+1,n-1)&
-    -vs0(iv,iy,n-1))/d
+do ix = 1, Nx-1
+  iu = ix + 1
+  do iy = 1, Ny-1
+    iv = iy + 1
+    h0(ix,iy,n) = h0(ix,iy,n-1)-delt*(us0(iu,iy,n-1)-us0(iu-1,iy,n-1)+&
+    vs0(ix,iv,n-1)-vs0(ix,iv-1,n-1))/d
   end do
 end do
-
+!------------------------Differential Equations--------------------------------
 !iterated potential vorticity
 q0(:,:,n) = (f+z0(:,:,n))/hq0(:,:,n)
  !Periodic boundary conditions
@@ -186,28 +212,277 @@ do j = 2,Ny-1
   hv0(:,j,n) = (h0(:,j-1,n) + h0(:,j+1,n))/2.0
 end do
 
-us0(:,:,n)= hu0(:,:,n)*u(:,;)
+us0(:,:,n)= hu0(:,:,n)*u0(:,:,n)
+vs0(:,:,n)= hv0(:,:,n)*v0(:,:,n)
+end do
+
+!coefficient forced forward scheme v0
+do iy = 1, Ny
+  iu = iy + 1
+  do ix = 1, Nx - 1
+    iv = ix + 1
+    v0(ix,iy,n) = v0(ix,iy,n-1) - gam0(iv,iu+1,n-1)*us0(iv,iu+1,n-1) &
+    - dlt0(iv-1,iu,n-1)*us0(iv-1,iu,n-1) - alp0(iv-1,iu-1,n-1)*us0(iv-1,iu-1,n-1) &
+    - bet0(iv,iu-1,n-1)*us0(iv,iu-1,n-1) - zet0(ix,iu,n-1)*vs0(ix,iy+1,n-1) &
+    + zet0(ix,iu-1,n-1)*vs0(ix,iu-1,n-1) - ((ken0(ix,iu,n-1)+phi0(ix,iu,n-1)) &
+    - ken0(ix,iu-1,n-1)+phi0(ix,iu-1,n-1))/d
+  end do
+end do
+!coefficient forced forward scheme u0
+! u wind for boundary conditions
+do iy = 1, Ny-1
+  iv = iy + 1
+  u0(1,iy,n) = u0(1,iy,n-1) + delt*(alp0(1,iy,n-1)*vs0(1,iv,n-1) &
+  - bet0(1,iy,n-1)*vs0(Nx-1,iv,n-1) - gam0(Nx,iy,n-1)*vs0(1,iv-1,n-1) &
+  - dlt0(1,iy,n-1)*vs0(1,iv-1,n-1) + eps0(1,iy,n-1)*us0(1,iy,n-1) &
+  - eps0(Nx-1,iy,n-1)*us0(Nx,iy,n-1) + ((ken0(1,iy,n-1)+phi0(1,iy,n-1)) &
+  -ken0(Nx-1,iy,n-1)+phi0(Nx-1,iy,n-1))/d
+  u0(Nx,iy,n) = u0(Nx,iy,n-1) + delt*(alp0(Nx,iy,n-1)*vs0(1,iv,n-1) &
+  - bet0(Nx,iy,n-1)*vs0(Nx-1,iv,n-1) - gam0(Nx,iy,n-1)*vs0(Nx-1,iv-1,n-1) &
+  - dlt0(Nx,iy,n-1)*vs0(1,iv-1,n-1) + eps0(1,iy,n-1)*us0(1,iy,n-1) &
+  - eps0(Nx-1,iy,n-1)*us0(Nx-1,iy,n-1) + ((ken0(1,iy,n-1)+phi0(1,iy,n-1)) &
+  -ken0(Nx-1,iy,n-1)+phi0(Nx-1,iy,n-1))/d
+end do
+! u wind for interior of domain
+do ix = 2, Nx - 1
+  do iy = 1, Ny - 1
+  iv = iy + 1
+  u0(ix,iy,n) = u0(ix,iy,n-1) + delt*(alp0(ix,iy,n-1)*vs0(ix,iv,n-1) &
+  - bet0(ix,iy,n-1)*vs0(ix,iv,n-1) - gam0(ix,iy,n-1)*vs0(ix-1,iv-1,n-1) &
+  - dlt0(ix,iy,n-1)*vs0(ix,iv-1,n-1) + eps0(ix,iy,n-1)*us0(ix+1,iy,n-1) &
+  - eps0(ix-1,iy,n-1)*us0(ix-1,iy,n-1) + ((ken0(ix,iy,n-1)+phi0(ix,iy,n-1)) &
+  -ken0(ix-1,iy,n-1)+phi0(ix-1,iy,n-1))/d
+  end do
+end do
+!hu0
+hu0(1,:,n) = (h0(Nx-1,:,n)+h0(1,:,n))/2.0 !hu0 at the left boundary for all y
+hu0(Nx,:,n) = (h0(Nx-1,:,n)+h0(1,:,n))/2.0 !hu0 at the right boundary for all y
+do ix = 2, Nx-1 !hu0 iterated from 2 to Nx - 1
+  iv = ix + 1 !hu0 indexed by +1 offset in x direction
+  hu0(ix,:,n)=(h(iv,:,n) + h(iv-1,:,n))/2.0 !hu0 within the domain
+end do
+!hv0
+hv0(:,1,n) = (h0(:,Ny-1,n) + h0(:,1,n))/2.0 !hv0 at the bottom row for all x
+hv0(:,Ny,n) = (h0(:,Ny-1,n) + h0(:,1,n))/2.0 !hv0 at top row for all x
+do iy = 2, Ny-1 !hv0 iterated from 2 to Ny - 1
+  iu = iy + 1 !hv0 indexed by +1 offset in y direction
+  hv0(:,iy,n) = (h(:,iu,n) + h(:,iu-1,n))/2.0 !hv0 within the domain
+end do
+!hq0
+hq0(1,:,n) = (hv0(1,:,n) + hv0(Nx-1,:,n))/2.0 !hq0 at the left boundary
+hq0(Nx,:,n) = (hv0(1,:,n) + hv0(Nx-1,:,n))/2.0 !hq0 at the right boundary
+do ix = 2, Nx-1 !hq0 iterated from 2 to Nx - 1
+  do iy = 1, Ny !hq0 iterated from 1 to Ny
+    hq0(ix,iy,n) = (hv0(ix,:,n) + hv0(ix-1,:,n))/2.0 !hq0 within the domain
+  end do
+end do
+!us0 and vs0
+us0(:,:,n)= hu0(:,:,n)*u(:,:)
 vs0(:,:,n)= hv0(:,:,n)*v(:,:)
+!relative vorticity
+!left to right relative vorticity
+do iy = 2, Ny-1
+  z0(1,iy,n)=(u(1,iy-1)-u(1,iy)+v(2,iy)-v(Nx,iy))/d !for all iy until Ny - 1
+  z0(Nx,iy,n)=(u(Nx,iy-1)-u(1,iy)+v(1,iy)-v(Nx-1,iy))/d !for all iy until Ny - 1
+end do
+!bottom to top relative vorticity
+do ix = 2, Nx - 1
+  z0(ix,1,n)=(-u(ix,1)+v(ix,1)-v(ix-1,1))/d !for all ix until Nx - 1
+  z0(ix,Ny,n)=(u(ix,Ny-1)+v(ix,Ny)-v(ix-1,Ny))/d !for all ix until Nx - 1
+end do
+!interior of domain relative vorticity
+do ix = 2, Nx-1
+  iv = ix + 1
+  do iy = 2, Ny-1
+    iu = iy + 1
+    z0(ix,iy,n)=(u(ix,iu-1)-u(ix,iu)+v(iv+1,iy)-v(iv,iy))/2
+  end do
+end do
+!forcing coefficients alpha delta epsilon zeta
+do ix = 1, Nx - 1
+  do iy = 1, Ny - 1
+    alp0(ix,iy,n) = (1/24)*(2*q0(ix+1,iy+1)+q0(ix,iy+1)+2*q0(ix,iy)+q0(ix+1,iy))
+    dlt0(ix,iy,n) = (1/24)*(q0(ix+1,iy+1)+2*q0(ix,iy+1)+q0(ix,iy)+2*q0(ix+1,iy))
+    eps0(ix,iy,n) = (1/24)*(q0(ix+1,iy+1)+q0(ix,iy+1)-q0(ix,iy)-q0(ix+1,iy))
+    zet0(ix,iy,n) = (1/24)*(-q0(ix+1,iy+1)+q0(ix,iy+1)+q0(ix,iy)-q0(ix+1,iy))
+  end do
+end do
+!forcing coefficients beta and gamma
+!boundary conditions
+do iy = 1, Ny - 1
+  bet0(1,iy,n) = (1/24)*(q0(ix,iy+1)+2*q0(Nx,iy+1)+q0(Nx,iy)+2*q0(ix,iy))
+  gam0(1,iy,n) = (1/24)*(2*q0(ix,iy+1)+q0(Nx,iy+1)+2*q0(Nx,iy)+q0(ix,iy))
+end do
+!interior points
+do ix = 2, Nx - 1
+  do iy = 1, Ny - 1
+    bet0(ix,iy,n) = (1/24)*(q0(ix,iy+1)+2*q0(ix-1,iy+1)+q0(ix-1,iy)+2*q0(ix,iy))
+    gam0(ix,iy,n) = (1/24)*(2*q0(ix,iy+1)+q0(ix-1,iy+1)+2*q0(ix-1,iy)+q0(ix,iy))
+  end do
+end do
+!initial geopotential height
+do ix = 1, Nx
+  phi0(ix,:,n) = g*hq0(ix,:,n)
+end do
+!initial potential vorticity
+q0(:,:,n) = (f+z0(:,:,n))/hq0(:,:,n)
+!kinetic energy
+do ix = 1, Nx - 1
+  iv = ix + 1
+  do iy = 1, Ny - 1
+    iu = iy + 1
+ken0(:,:,n) = ((us0(ix,iu,n)+us0(ix+1,iu,n)/2)**2)+(((vs0(iv,iy+1,n)+vs0(iv,iy,n)/2)**2))/2
+  end do
 end do
 
 
+!------------Adams Bashforth scheme given forward scheme timesteps-------------
+!initial conditions of experiment given by final values of Forward Euler Shceme
+h(:,:) = h0(:,:,3)
+u(:,:) = u0(:,:,3)
+v(:,:) = v0(:,:,3)
+q(:,:) = q0(:,:,3)
+z(:,:) = z0(:,:,3)
 
-!Adams Bashforth scheme given forward scheme timesteps
+us(:,:)=hu(:,:)*u(:,:)
+vs(:,:)=hv(:,:)*v(:,:)
+
+us1(:,:)=us0(:,:,3)
+us2(:,:)=us0(:,:,2)
+us3(:,:)=us0(:,:,1)
+vs1(:,:)=vs0(:,:,3)
+vs2(:,:)=vs0(:,:,2)
+vs3(:,:)=vs0(:,:,1)
+hu1(:,:)=hu2(:,:,3)
+hu2(:,:)=hu3(:,:,2)
+hu3(:,:)=hu(:,:,1)
+hv1(:,:)=hv2(:,:,3)
+hv2(:,:)=hv3(:,:,2)
+hv3(:,:)=hv(:,:,1)
+hq1(:,:)=hq(:,:,3)
+hq2(:,:)=hq3(:,:,2)
+hq3(:,:)=hq(:,:,1)
+alp1(:,:)=alp0(:,:,1)
+alp2(:,:)=alp0(:,:,2)
+alp3(:,:)=alp0(:,:,3)
+bet1(:,:)=bet0(:,:,1)
+bet2(:,:)=bet0(:,:,2)
+bet3(:,:)=bet0(:,:,3)
+gam1(:,:)=gam0(:,:,1)
+gam2(:,:)=gam0(:,:,2)
+gam3(:,:)=gam0(:,:,3)
+dlt1(:,:)=dlt0(:,:,1)
+dlt2(:,:)=dlt0(:,:,2)
+dlt3(:,:)=dlt0(:,:,3)
+eps1(:,:)=eps0(:,:,1)
+eps2(:,:)=eps0(:,:,2)
+eps3(:,:)=eps0(:,:,3)
+zet1(:,:)=zet0(:,:,1)
+zet2(:,:)=zet0(:,:,2)
+zet3(:,:)=zet0(:,:,3)
+ken1(:,:)=ken0(:,:,1)
+ken2(:,:)=ken0(:,:,2)
+ken3(:,:)=ken0(:,:,3)
+phi1(:,:)=phi0(:,:,1)
+phi2(:,:)=phi0(:,:,2)
+phi3(:,:)=phi0(:,:,3)
+
+
 nstep = 4
 do n = 4, ntime
   nstep = nstep + 1
-  do i = 2, Nx-1
-    do j = 2, Ny-1
-      h(i,j)-f1*(us1(i+1,j+1)-us1(i,j+1)+vs1(i+1,j+1)-vs1(i+1,j))+ &
-      f2*(us2(i+1,j+1)-us2(i,j+1)+vs2(i+1,j+1)-vs2(i+1,j))+ &
-      -f3*(us3(i+1,j+1)-us3(i,j+1)+vs3(i+1,j+1)-vs3(i+1,j))
+  do ix = 1, Nx-1
+    iu = ix + 1
+    do iy = 1, Ny-1
+      iv = iy + 1
+      h(ix,iy) = h(ix,iy)-f1*(us1(iu,iy)-us1(iu-1,iy)+vs1(ix,iv)-vs1(ix,iv-1))+ &
+      f2*(us2(iu,iy)-us2(iu-1,iy)+vs2(ix,iv)-vs2(ix,iv-1))+ &
+      -f3*(us3(iu,iy)-us3(iu-1,iy)+vs3(ix,iv)-vs3(ix,iv-1))
     end do
   end do
+!coefficient forced v
+  do iy = 1, Ny
+    iu = iy + 1
+    do ix = 1, Nx - 1
+      iv = ix + 1
+      v0(ix,iy,n) = v0(ix,iy) &
+
+      +f1*(-gam1(iv,iu+1,n-1)*us1(iv,iu+1,n-1) &
+      - dlt1(iv-1,iu,n-1)*us1(iv-1,iu,n-1) - alp1(iv-1,iu-1,n-1)*us1(iv-1,iu-1,n-1) &
+      - bet1(iv,iu-1,n-1)*us1(iv,iu-1,n-1) - zet1(ix,iu,n-1)*vs1(ix,iy+1,n-1) &
+      + zet1(ix,iu-1,n-1)*vs1(ix,iu-1,n-1) - ((ken1(ix,iu,n-1)+phi1(ix,iu,n-1)) &
+      - ken1(ix,iu-1,n-1)+phi1(ix,iu-1,n-1))/d) &
+
+      -f2*(-gam2(iv,iu+1,n-2)*us2(iv,iu+1,n-2) &
+      - dlt2(iv-1,iu,n-2)*us2(iv-1,iu,n-2) - alp2(iv-1,iu-1,n-2)*us2(iv-1,iu-1,n-2) &
+      - bet2(iv,iu-1,n-2)*us2(iv,iu-1,n-2) - zet2(ix,iu,n-2)*vs2(ix,iy+1,n-2) &
+      + zet2(ix,iu-1,n-2)*vs2(ix,iu-1,n-2) - ((ken2(ix,iu,n-2)+phi2(ix,iu,n-2)) &
+      - ken2(ix,iu-1,n-2)+phi2(ix,iu-1,n-2))/d) &
+
+      + f3*(-gam3(iv,iu+1,n-3)*us3(iv,iu+1,n-3) &
+      - dlt3(iv-1,iu,n-3)*us3(iv-1,iu,n-3) - alp3(iv-1,iu-1,n-3)*us3(iv-1,iu-1,n-3) &
+      - bet3(iv,iu-1,n-3)*us3(iv,iu-1,n-3) - zet3(ix,iu,n-1)*vs3(ix,iy+1,n-3) &
+      + zet3(ix,iu-1,n-3)*vs3(ix,iu-1,n-3) - ((ken3(ix,iu,n-1)+phi3(ix,iu,n-3)) &
+      - ken3(ix,iu-1,n-3)+phi3(ix,iu-1,n-3))/d)
+    end do
+  end do
+!coefficient forced u
+do iy = 1, Ny-1       !u wind at left and right boundary
+  iv = iy + 1
+    u(1,iy)= u(1,iy)+f1*(alp1(1,iy)*vs1(1,iv)+bet1(1,iy)&
+      *vs1(Nx-1,iv)+gam1(Nx,iy)*vs1(Nx-1,iv-1)&
+      +dlt1(1,iy,)*vs1(1,iv-1)-eps1(1,iy)*us1(iy)&
+      +eps1(Nx-1,iy)*us1(Nx,iy)-((ken1(1,iy)+phi1(1,iy))&
+      -(ken1(Nx-1,iy)+phi1(Nx-1,iy)))/d)-f2*(alp2(1,iy)&
+      *vs2(1,iv)+bet2(1,iy)*vs2(Nx-1,iv)+gam2(Nx,iy)&
+      *vs2(Nx-1,iv-1)+dlt2(1,iy,)*vs2(1,iv-1)-eps2(1,iy)&
+      *us2(iy)+eps2(Nx-1,iy)*us2(Nx,iy)-((ken2(1,iy)+phi2(1,iy))&
+      -(ken2(Nx-1,iy)+phi2(Nx-1,iy)))/d)+f3*(alp3(1,iy)&
+      *vs3(1,iv)+bet3(1,iy)*vs3(Nx-1,iv)+gam3(Nx,iy)&
+      *vs3(Nx-1,iv-1)+dlt3(1,iy,)*vs3(1,iv-1)-eps3(1,iy)&
+      *us3(iy)+eps3(Nx-1,iy)*us3(Nx,iy)-((ken3(1,iy)&
+      +phi3(1,iy))-(ken3(Nx-1,iy)+phi3(Nx-1,iy)))/d)
+
+      u(Nx,iy)= u(Nx,iy)+f1*(alp1(Nx,iy)*vs1(1,iv)+bet1(Nx,iy,n-1)&
+          *vs1(Nx-1,iv)+gam1(Nx,iy)*vs1(Nx-1,iv-1)+dlt1(Nx,iy)&
+          *vs1(1,iv-1)-eps1(1,iy)*us1(1,iy,n-1)+eps1(Nx-1,iy)&
+          *us1(Nx-1,iy)-((ken1(1,iy)+phi1(1,iy))-(ken1(Nx-1,iy)&
+          +phi1(Nx-1,iy)))/d)-f2*(alp2(Nx,iy)*vs2(1,iv)&
+          +bet2(Nx,iy,n-1)*vs2(Nx-1,iv)+gam2(Nx,iy)*vs2(Nx-1,iv-1)&
+          +dlt2(Nx,iy)*vs2(1,iv-1)-eps2(1,iy)*us2(1,iy,n-1)&
+          +eps2(Nx-1,iy)*us2(Nx-1,iy)-((ken2(1,iy)+phi2(1,iy))&
+          -(ken2(Nx-1,iy)+phi2(Nx-1,iy)))/d)+f3*(alp3(Nx,iy)&
+          *vs3(1,iv)+bet3(Nx,iy,n-1)*vs3(Nx-1,iv)+gam3(Nx,iy)&
+          *vs3(Nx-1,iv-1)+dlt3(Nx,iy)*vs3(1,iv-1)-eps3(1,iy)&
+          *us3(1,iy,n-1)+eps3(Nx-1,iy)*us3(Nx-1,iy)-((ken3(1,iy)&
+          +phi3(1,iy))-(ken3(Nx-1,iy)+phi3(Nx-1,iy)))/d)
+end do
+do ix = 2, Nx-1      !u wind at all other points
+  do iy = 1, Ny-1
+              iv = iy + 1
+  u(ix,iy,n)= u(ix,iy)+f1*(alp1(ix,iy)*vs1(ix,iv)&
+      +bet1(ix,iy)*vs1(ix,iv)+gam1(ix,iy)&
+      *vs1(ix-1,iv-1)+dlt1(ix,iy)*vs1(ix,iv-1)&
+      -eps1(ix,iy)*us1(ix+1,iy)+eps1(ix-1,iy)&
+      *us1(ix-1,iy)-((ken1(ix,iy)+phi1(ix,iy))&
+      -(ken1(ix-1,iy)+phi1(ix-1,iy)))/d)-f2*(alp2(ix,iy)&
+      *vs2(ix,iv)+bet2(ix,iy)*vs2(ix,iv)+gam2(ix,iy)&
+      *vs2(ix-1,iv-1)+dlt2(ix,iy)*vs2(ix,iv-1)&
+      -eps2(ix,iy)*us2(ix+1,iy)+eps2(ix-1,iy)&
+      *us2(ix-1,iy)-((ken2(ix,iy)+phi2(ix,iy))&
+      -(ken2(ix-1,iy)+phi2(ix-1,iy)))/d)+f3*(alp3(ix,iy)&
+      *vs3(ix,iv)+bet3(ix,iy)*vs3(ix,iv)+gam3(ix,iy)&
+      *vs3(ix-1,iv-1)+dlt3(ix,iy)*vs3(ix,iv-1)-eps3(ix,iy)&
+      *us3(ix+1,iy)+eps3(ix-1,iy)*us3(ix-1,iy)&
+      -((ken3(ix,iy)+phi3(ix,iy))-(ken3(ix-1,iy)&
+      +phi3(ix-1,iy)))/d)
+  end do
+end do
 
 !hv1
 do ix = 2, Nx-1
   iv = ix + 1
-  hu(iv,:) = (h(iv-1,:) + h(iv,1,:))/2.0
+  hv(iv,:) = (h(iv-1,:) + h(iv,1,:))/2.0
 end do
 
 !hu1
@@ -216,23 +491,23 @@ do iy = 2, Ny-1
   hu(:,iy) = (h(:,iu-1) + h(:,iu))/2.0
 end do
 
-us(:,:)=hu(:,:)*u(:,:)
-vs(:,:)=hv(:,:)*v(:,:)
+!update us hu hv
+us1 = us
+us2 = us1
+us3 = us2
+hu1 = hu
+hu2 = hu1
+hu3 = hu2
+hv1 = hv
+hv2 = hv1
+hv3 = hv2
 
-us1=us2
-us2=us3
-us3=us
-hu1=hu2
-hu2=hu3
-hu3=hu
-hv1=hv2
-hv2=hv3
-hv3=hv
 
 !time loop
 if (nstep == 1440) then
   write(10,*)h,u,v
   nstep = 0
+end if
 end do
 
 end Program Shallow
